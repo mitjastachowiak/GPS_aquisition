@@ -36,26 +36,31 @@ public class Acquisition {
 	
 	public boolean startAcquisition() {
 		if (sampleCount != Xin.vec.length || codeCount != Xin.vec.length) throw new IllegalArgumentException("Required ammount of samples/codes was not given!");
-        int m = (int)((fmax-fmin)/fstep) + 1;
+		
+		int m = (int)((fmax-fmin)/fstep) + 1;
         int N = Xin.vec.length;
         ComplexMat R = new ComplexMat(m, N);
         for (int nf = 0; nf < m; nf++) {
           double fd = fmin + nf*fstep;
-        	
+          System.out.println(" === fd = " + Double.toString(fd) + " === ");
+          
           ComplexVec Xfd = new ComplexVec(N);
           for (int n = 0; n < N; n++) {
             Xfd.vec[n] = Xin.vec[n].mul(Complex.j().mul(fd*n*2*Math.PI/fs));
           }
+          System.out.println("Xfd = ");
+          Xfd.print();
 
 		  ComplexVec rfd = Xfd.dft().mul(C.adj().dft()).idft().div(N);
 		  R.setColumn(nf, rfd);
+          System.out.println("Rfd = ");
+          rfd.print();
         }
         
         // find max
         ComplexMat.Max max = R.abs2Max();
         dopplerShift = (max.ix - (int)(m/2)) * (int)fstep;
         codeShift = max.iy;
-        System.out.println(max.val);
         
         // compute gamma = signal to noise
         double Pin = 0;
@@ -148,6 +153,10 @@ public class Acquisition {
 	  	a.vec[k] = a.vec[k].div(N);
 	  }
 	  return a;
+	}
+	
+	public void print () {
+	  for (int k = 0; k < this.vec.length; k++) System.out.println("   "+Double.toString(this.vec[k].r) + " + j" + Double.toString(this.vec[k].i));
 	}
   }
   
