@@ -11,6 +11,11 @@ public class Acquisition {
 	private int codeCount = 0;
 	private ComplexVec Xin;   // samples
 	private ComplexVec C;     // codes
+	private final double fs = 400000; // hz
+	private final double fstep = 1000; // hz
+	private final double fmax = 5000; // hz
+	private final double fmin = -5000; // hz
+	private final double sn_threshold = 0.015;
 	
 	public Acquisition(int nrOfSamples){
 		Xin = new ComplexVec(nrOfSamples);
@@ -31,17 +36,34 @@ public class Acquisition {
 	
 	public boolean startAcquisition() {
 		if (sampleCount != Xin.vec.length || codeCount != Xin.vec.length) throw new IllegalArgumentException("Required ammount of samples/codes was not given!");
-        float fs;
-        float fd;
-        
-        ComplexVec Xfd = new ComplexVec(Xin.vec.length);
-        for (int n = 0; n < Xin.vec.length; n++) {
-          Xfd.vec[n] = Xin.vec[n].mul(Complex.j().mul(fd*n*2*Math.PI/fs));
-        }
+        int m = (int)((fmax-fmin)/fstep) + 1;
+        int N = Xin.vec.length;
+        ComplexMat R = new ComplexMat(m, N);
+        for (int nf = 0; nf < m; nf++) {
+          double fd = fmin + nf*fstep;
+        	
+          ComplexVec Xfd = new ComplexVec(N);
+          for (int n = 0; n < N; n++) {
+            Xfd.vec[n] = Xin.vec[n].mul(Complex.j().mul(fd*n*2*Math.PI/fs));
+          }
 
-		ComplexVec rfd = Xfd.dft().mul(C.adj().dft()).idft().div(Xfd.vec.length);
-		
-		return false;
+		  ComplexVec rfd = Xfd.dft().mul(C.adj().dft()).idft().div(N);
+		  R.setColumn(nf, rfd);
+        }
+        
+        // find max
+        ComplexMat.Max max = R.abs2Max();
+        dopplerShift = (max.ix - (int)(m/2)) * (int)fstep;
+        codeShift = max.iy;
+        System.out.println(max.val);
+        
+        // compute gamma = signal to noise
+        double Pin = 0;
+        for (int k = 0; k < N; k++) Pin += Xin.vec[k].abs2();
+        Pin /= N;
+        double gamma = max.val / Pin;
+        
+		return gamma > sn_threshold;
 	}
 	
 	public int getDopplerverschiebung() { return dopplerShift; }
@@ -49,7 +71,7 @@ public class Acquisition {
 	public int getCodeVerschiebung(){ return codeShift; }
 	
 	
-  public static class Complex {
+  private static class Complex {
 	public double r;
 	public double i;
 	public Complex (double r, double i) {
@@ -67,6 +89,8 @@ public class Acquisition {
 	
 	public Complex adj () { return new Complex(this.r, -this.i); }
 	
+	public double abs2 () { return this.r*this.r + this.i*this.i; }
+	
 	static public Complex j () { return new Complex(0, 1); }
 	static public Complex exp (Complex c) {
 	  double e = Math.exp(c.r);
@@ -76,14 +100,14 @@ public class Acquisition {
   
   
   
-  public static class ComplexVec {
+  private static class ComplexVec {
 	public Complex[] vec;
 	public ComplexVec (int size) {
       vec = new Complex[size];
 	}
 	
 	public ComplexVec mul (ComplexVec v) {
-	  if (this.vec.length != v.vec.length) throw new IllegalArgumentException("Vactors don't have equal size!");
+	  if (this.vec.length != v.vec.length) throw new IllegalArgumentException("Vectors don't have equal size!");
 	  ComplexVec r = new ComplexVec(this.vec.length);
 	  for (int k = 0; k < this.vec.length; k++) r.vec[k] = this.vec[k].mul(v.vec[k]);
 	  return r;
@@ -124,6 +148,35 @@ public class Acquisition {
 	  	a.vec[k] = a.vec[k].div(N);
 	  }
 	  return a;
+	}
+  }
+  
+  
+  
+  private static class ComplexMat {
+	public Complex[][] mat;
+	public ComplexMat(int dimX, int dimY) {
+      mat = new Complex[dimX][dimY];
+	}
+	
+	public void setColumn(int column, ComplexVec v) {
+	  if (column >= mat.length || v.vec.length != mat[column].length) throw new IllegalArgumentException("Vectorsize or column is not within matrix dimension!");
+      for (int k = 0; k < v.vec.length; k++) mat[column][k] = v.vec[k];
+	}
+	
+	public static class Max {
+	  public double val;
+	  public int ix;
+	  public int iy;
+	}
+	public Max abs2Max () {
+	  Max r = new Max();
+	  for (int ix = 0; ix < mat.length; ix++) for (int iy = 0; iy < mat[ix].length; iy++) if (mat[ix][iy].abs2() > r.val) {
+		r.val = mat[ix][iy].abs2();
+		r.ix = ix;
+		r.iy = iy;
+	  }
+	  return r;
 	}
   }
 }
