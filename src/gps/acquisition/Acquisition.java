@@ -37,24 +37,33 @@ public class Acquisition {
 	public boolean startAcquisition() {
 		if (sampleCount != Xin.vec.length || codeCount != Xin.vec.length) throw new IllegalArgumentException("Required ammount of samples/codes was not given!");
 		
+		// Compute R
 		int m = (int)((fmax-fmin)/fstep) + 1;
         int N = Xin.vec.length;
         ComplexMat R = new ComplexMat(m, N);
         for (int nf = 0; nf < m; nf++) {
           double fd = fmin + nf*fstep;
-          System.out.println(" === fd = " + Double.toString(fd) + " === ");
           
+          // compute Xfd
           ComplexVec Xfd = new ComplexVec(N);
           for (int n = 0; n < N; n++) {
-            Xfd.vec[n] = Xin.vec[n].mul(Complex.j().mul(fd*n*2*Math.PI/fs));
+            Xfd.vec[n] = Xin.vec[n].mul(Complex.exp(new Complex(0, -2*Math.PI*fd*n/fs)));
           }
+          
+          /*
+          // Test: Xfd and the fourier-transforms are correct!
+          System.out.println(" === fd = " + Double.toString(fd) + " === ");       
           System.out.println("Xfd = ");
           Xfd.print();
+          System.out.println("Xfd_dft = ");
+          Xfd.dft().print();                   // equal to 01_intermed_dft_X_fd.dat
+          System.out.println("Xfd_idft = ");
+          Xfd.dft().idft().print();            // equal to Xdf.print()
+          */
 
-		  ComplexVec rfd = Xfd.dft().mul(C.adj().dft()).idft().div(N);
+          // compute rfd
+		  ComplexVec rfd = Xfd.dft().mul(C.dft().adj()).idft().div(N);
 		  R.setColumn(nf, rfd);
-          System.out.println("Rfd = ");
-          rfd.print();
         }
         
         // find max
@@ -67,7 +76,7 @@ public class Acquisition {
         for (int k = 0; k < N; k++) Pin += Xin.vec[k].abs2();
         Pin /= N;
         double gamma = max.val / Pin;
-        
+
 		return gamma > sn_threshold;
 	}
 	
