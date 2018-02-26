@@ -19,7 +19,7 @@ public class Acquisition {
   private final float fmax = 5000; // hz
   private final float fmin = -5000; // hz
   private final float sn_threshold = 0.015f;
-  public static final boolean debug = true;
+  public static final boolean debug = false;
   
   public Acquisition(int nrOfSamples){
     Xin = new ComplexVec(nrOfSamples);
@@ -55,7 +55,7 @@ public class Acquisition {
   
   public boolean startAcquisition() {
     log("");
-    log("== Start Acquisition ==");
+    log("== Start Acquisition ("+codeCount+" samples) ==");
     if (debug && (codeCount != sampleCount || codeCount != Xin.vec.length)) throw new IllegalArgumentException("Required ammount of samples/codes was not given!");
     int m = (int)((fmax-fmin)/fstep) + 1;
     int N = Xin.vec.length;

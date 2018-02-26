@@ -74,6 +74,10 @@ public class Acquisition_simple {
     public int getDopplerverschiebung() { return dopplerShift; }
     
     public int getCodeVerschiebung(){ return codeShift; }
+
+    
+    
+    
     
     
   private static class Complex {
